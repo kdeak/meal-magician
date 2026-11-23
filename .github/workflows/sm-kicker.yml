@@ -34,26 +34,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  preflight:
-    runs-on: ubuntu-latest
-    outputs:
-      machine_sm_available: ${{ steps.check.outputs.available }}
-    steps:
-      - name: Check whether machine-sm.yml is dispatchable on the default branch
-        id: check
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/machine-sm.yml" >/dev/null 2>&1; then
-            echo "available=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "::notice::machine-sm.yml is not yet available on the default branch; skipping kicker during factory bootstrap."
-            echo "available=false" >> "$GITHUB_OUTPUT"
-          fi
-
   kicker:
-    needs: preflight
-    if: needs.preflight.outputs.machine_sm_available == 'true'
     uses: IstiN/dmtools-agentic-workflows/.github/workflows/factory-sm-kicker.yml@main
     with:
       runner: ubuntu-latest
