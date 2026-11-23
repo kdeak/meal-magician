@@ -9,7 +9,7 @@
 # digest from `docker image inspect eclipse-temurin:25-jdk --format '{{index .RepoDigests 0}}'`
 # (Dependabot's docker ecosystem proposes the same change weekly).
 
-FROM eclipse-temurin:25-jdk@sha256:83f4a7fc27df94dcc7b8de04d14cbbba8da14406f921e966969c3b09000aa507 AS build
+FROM eclipse-temurin:25-jdk@sha256:ce2ef9d2d67a68de5e196d4de9d743327c44a10b57fe02ec39f572c652cacfd3 AS build
 # scripts/install-tailwind.sh downloads the Tailwind CLI with curl, which the JDK image lacks.
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends curl \
@@ -27,7 +27,13 @@ RUN --mount=type=cache,target=/root/.gradle \
     # Unpack into app.jar + lib/: CDS and AOT caches cannot read the nested jars of a fat jar.
     && java -Djarmode=tools -jar build/libs/app.jar extract --destination /workspace/extracted
 
-FROM eclipse-temurin:25-jre@sha256:ecdc0adb37bde1a281c4d245a3cd535004b1fc8322d560f5b09463b248c81df0
+FROM eclipse-temurin:25-jre@sha256:4ed132f6832e9804b123e89a849a7b4502756ae64a4ee08ebab939d9d5d0a9fa
+# Apply any Debian security patches released after this digest was pinned, so Trivy's
+# HIGH/CRITICAL gate (ignore-unfixed: true) stays green between deliberate digest bumps.
+RUN apt-get update \
+    && apt-get upgrade --yes --no-install-recommends \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 # uid 10001 is not in use by the base image; no home directory and no login shell.
 RUN groupadd --gid 10001 app \
     && useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin app
