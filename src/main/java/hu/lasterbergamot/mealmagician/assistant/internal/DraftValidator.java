@@ -229,23 +229,66 @@ final class DraftValidator {
     if (raw == null) {
       return null;
     }
-    List<String> kept = new ArrayList<>();
-    Set<String> seen = new LinkedHashSet<>();
-    int length = 0;
+    NameAccumulator accumulator = new NameAccumulator(countMax, totalMax);
     for (String candidate : raw) {
       String name = clean(candidate, itemMax + 1);
-      if (name.isEmpty() || name.length() > itemMax || !seen.add(name.toLowerCase(Locale.ROOT))) {
+      if (!isUsable(name, itemMax, accumulator.seen)) {
         continue;
       }
-      int added =
-          length + name.length() + (kept.isEmpty() ? 0 : DraftItemEntity.SEPARATOR.length());
-      if (kept.size() >= countMax || added > totalMax) {
+      if (!accumulator.offer(name)) {
         break;
       }
+    }
+    return accumulator.join();
+  }
+
+  /**
+   * Whether a cleaned candidate name may be kept: not blank, not over the per-item limit, and not
+   * a repeat (ignoring case) of one already seen.
+   *
+   * @param name the cleaned candidate
+   * @param itemMax the longest name the catalog accepts
+   * @param seen the lower-cased names kept so far
+   * @return {@code true} when the candidate is usable
+   */
+  private static boolean isUsable(String name, int itemMax, Set<String> seen) {
+    return !name.isEmpty() && name.length() <= itemMax && !seen.contains(name.toLowerCase(Locale.ROOT));
+  }
+
+  /** Accumulates kept names up to a count and a joined column size. */
+  private static final class NameAccumulator {
+    private final int countMax;
+    private final int totalMax;
+    private final List<String> kept = new ArrayList<>();
+    private final Set<String> seen = new LinkedHashSet<>();
+    private int length = 0;
+
+    NameAccumulator(int countMax, int totalMax) {
+      this.countMax = countMax;
+      this.totalMax = totalMax;
+    }
+
+    /**
+     * Tries to keep a name that already passed {@link #isUsable}.
+     *
+     * @param name the name to keep
+     * @return {@code true} when kept; {@code false} when the count or size limit was reached (the
+     *     caller stops offering further names)
+     */
+    boolean offer(String name) {
+      int added = length + name.length() + (kept.isEmpty() ? 0 : DraftItemEntity.SEPARATOR.length());
+      if (kept.size() >= countMax || added > totalMax) {
+        return false;
+      }
+      seen.add(name.toLowerCase(Locale.ROOT));
       kept.add(name);
       length = added;
+      return true;
     }
-    return kept.isEmpty() ? null : String.join(DraftItemEntity.SEPARATOR, kept);
+
+    String join() {
+      return kept.isEmpty() ? null : String.join(DraftItemEntity.SEPARATOR, kept);
+    }
   }
 
   /**

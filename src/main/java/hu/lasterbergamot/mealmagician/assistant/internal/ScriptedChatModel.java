@@ -179,43 +179,61 @@ class ScriptedChatModel implements ChatModel {
 
   @Override
   public ChatResponse call(Prompt prompt) {
+    List<String> userMessages = userMessagesOf(prompt);
+    String last = userMessages.getLast();
+    String requestText = requestTextOf(last);
+    requests.add(requestText);
+    prompts.add(allText(prompt));
+    pause();
+    failIfScripted(requestText);
+    String answer = answerFor(prompt, userMessages, last, requestText);
+    return new ChatResponse(
+        List.of(new Generation(new AssistantMessage(answer))),
+        ChatResponseMetadata.builder().usage(new DefaultUsage(10, 10, 20)).build());
+  }
+
+  /** Every user-turn text of a prompt, oldest first. */
+  private static List<String> userMessagesOf(Prompt prompt) {
     List<String> userMessages = new ArrayList<>();
     for (Message message : prompt.getInstructions()) {
       if (message.getMessageType() == MessageType.USER) {
         userMessages.add(message.getText());
       }
     }
-    String last = userMessages.getLast();
-    String requestText = requestTextOf(last);
-    requests.add(requestText);
-    prompts.add(allText(prompt));
-    pause();
+    return userMessages;
+  }
+
+  /** Throws the scripted failure when the switch or the request text asks for it. */
+  private void failIfScripted(String requestText) {
     if (failing || requestText.contains(FAIL_MARKER)) {
       throw new IllegalStateException("scripted failure");
     }
+  }
+
+  /** The scripted answer text for one call, dispatched by what the system prompt asks for. */
+  private String answerFor(Prompt prompt, List<String> userMessages, String last, String requestText) {
     String system = prompt.getInstructions().getFirst().getText();
     boolean hungarian = system.contains("in Hungarian");
-    String answer;
     if (system.contains(CHAT_MARK)) {
-      answer = chatReply != null ? chatReply : "Scripted answer: " + requestText;
-    } else if (system.contains(MENU_MARK)) {
-      answer = menuReply != null ? menuReply : menuAnswer(libraryIds(prompt));
-    } else {
-      List<Long> ids = libraryIds(prompt);
-      if (SLOT_REQUEST.matcher(last).find()) {
-        answer = slotAnswer(ids, hungarian);
-      } else {
-        Matcher week = WEEK_START.matcher(userMessages.getFirst());
-        LocalDate monday = week.find() ? LocalDate.parse(week.group(1)) : LocalDate.now();
-        answer =
-            userMessages.size() == 1
-                ? firstAnswer(monday, ids, hungarian)
-                : refinedAnswer(monday, ids, hungarian);
-      }
+      return chatReply != null ? chatReply : "Scripted answer: " + requestText;
     }
-    return new ChatResponse(
-        List.of(new Generation(new AssistantMessage(answer))),
-        ChatResponseMetadata.builder().usage(new DefaultUsage(10, 10, 20)).build());
+    if (system.contains(MENU_MARK)) {
+      return menuReply != null ? menuReply : menuAnswer(libraryIds(prompt));
+    }
+    return planAnswer(prompt, userMessages, last, hungarian);
+  }
+
+  /** The week/follow-up/one-slot answer: everything the system prompt does not special-case. */
+  private String planAnswer(Prompt prompt, List<String> userMessages, String last, boolean hungarian) {
+    List<Long> ids = libraryIds(prompt);
+    if (SLOT_REQUEST.matcher(last).find()) {
+      return slotAnswer(ids, hungarian);
+    }
+    Matcher week = WEEK_START.matcher(userMessages.getFirst());
+    LocalDate monday = week.find() ? LocalDate.parse(week.group(1)) : LocalDate.now();
+    return userMessages.size() == 1
+        ? firstAnswer(monday, ids, hungarian)
+        : refinedAnswer(monday, ids, hungarian);
   }
 
   /** Every message of a prompt, system message first, as one text (for the prompt checks). */

@@ -65,35 +65,60 @@ class ProductionConfigGuard implements BeanFactoryPostProcessor {
    */
   static List<String> problems(Environment environment) {
     var problems = new ArrayList<String>();
+    checkGoogleClient(environment, problems);
+    checkAdminEmails(environment, problems);
+    checkDatasource(environment, problems);
+    checkForwardHeaders(environment, problems);
+    checkFakeAiProfile(environment, problems);
+    checkAssistantSettings(environment, problems);
+    return problems;
+  }
+
+  private static void checkGoogleClient(Environment environment, List<String> problems) {
     if (isMissing(environment.getProperty(CLIENT + "client-id"))) {
       problems.add("GOOGLE_CLIENT_ID is not set");
     }
     if (isMissing(environment.getProperty(CLIENT + "client-secret"))) {
       problems.add("GOOGLE_CLIENT_SECRET is not set");
     }
+  }
+
+  private static void checkAdminEmails(Environment environment, List<String> problems) {
     var admins = environment.getProperty("mm.admin-emails", "");
     if (admins.isBlank() || admins.replace(",", "").isBlank()) {
       problems.add("MM_ADMIN_EMAILS is not set (nobody could manage the allowlist)");
     }
+  }
+
+  private static void checkDatasource(Environment environment, List<String> problems) {
     var datasourceUrl = environment.getProperty("spring.datasource.url", "");
     if (!datasourceUrl.startsWith("jdbc:postgresql:")) {
       problems.add("SPRING_DATASOURCE_URL must be a jdbc:postgresql: URL");
     }
+  }
+
+  private static void checkForwardHeaders(Environment environment, List<String> problems) {
     if (!"framework".equals(environment.getProperty("server.forward-headers-strategy"))) {
       problems.add(
           "server.forward-headers-strategy must be 'framework' (the hosting proxy terminates TLS)");
     }
+  }
+
+  private static void checkFakeAiProfile(Environment environment, List<String> problems) {
     if (environment.acceptsProfiles(Profiles.of("fake-ai"))) {
       problems.add("the fake-ai profile is for tests and demos and must not run in production");
     }
-    if (environment.getProperty("mm.ai.enabled", Boolean.class, false)) {
-      ASSISTANT_SETTINGS.forEach((property, message) -> {
-        if (isMissing(environment.getProperty(property))) {
-          problems.add(message + " (" + property + ") is not set but mm.ai.enabled=true");
-        }
-      });
+  }
+
+  private static void checkAssistantSettings(Environment environment, List<String> problems) {
+    if (!environment.getProperty("mm.ai.enabled", Boolean.class, false)) {
+      return;
     }
-    return problems;
+    ASSISTANT_SETTINGS.forEach((property, message) -> {
+      if (isMissing(environment.getProperty(property))) {
+        problems.add(message + " (" + property + ") is not set but mm.ai.enabled=true");
+      }
+    });
   }
 
   private static Map<String, String> assistantSettings() {
