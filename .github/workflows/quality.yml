@@ -19,6 +19,10 @@ jobs:
           distribution: temurin
           java-version: '25'
           overwrite-settings: false
+      # The Gradle build runs tailwindBuild while generating coverage. Install
+      # its pinned standalone CLI first; it is intentionally not committed.
+      - name: Install Tailwind CLI
+        run: bash scripts/install-tailwind.sh
       - name: Build and run CRAP analysis (IstiN/crap4java)
         run: |
           if ( [ ! -f pom.xml ] && [ ! -f build.gradle ] && [ ! -f build.gradle.kts ] ) || [ -z "$(find . -name '*.java' -not -path './.*' -print -quit)" ]; then
