@@ -38,7 +38,7 @@ RUN apt-get update \
 RUN groupadd --gid 10001 app \
     && useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin app
 WORKDIR /app
-COPY --from=build /workspace/extracted/ ./
+COPY --from=build --chown=app:app /workspace/extracted/ ./
 # Set before the training run below on purpose: the cache is only valid for the heap settings it
 # was recorded with. Cloud Run overrides the variable with its own value (D11).
 ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75"
