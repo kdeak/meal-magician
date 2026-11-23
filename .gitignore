@@ -33,3 +33,14 @@ apm_modules/
 
 # Neon CLI context (which org/project neonctl uses on this machine)
 .neon
+
+# Ignore hidden files and directories by default; allowlist existing tracked ones
+.*
+!/.claude/
+!/.claudeignore
+!/.dmtools/
+!/.dockerignore
+!/.env.example
+!/.fah/
+!/.github/
+!/.gitignore

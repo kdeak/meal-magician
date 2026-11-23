@@ -1,0 +1,13 @@
+# pr-12: chore: ignore hidden files in gitignore while preserving tracked configs
+
+## Description
+
+## Summary
+- Ignore newly created hidden files and directories by default (`.*`) in `.gitignore`.
+- Add root-anchored allowlist negations (`!/.claude/`, `!/.claudeignore`, `!/.dmtools/`, `!/.dockerignore`, `!/.env.example`, `!/.fah/`, `!/.github/`, `!/.gitignore`) so existing tracked dotfiles and new files inside tracked dot-directories remain trackable while `.claude/settings.local.json` and `.claude/worktrees/` remain ignored.
+
+## Docs
+- No doc impact: `.gitignore`-only hygiene change; no behavior, architecture, or workflow documentation is affected.
+
+## Test plan
+- [x] Verified ignore and allowlist precedence with `git check-ignore --no-index -v` across ignored dotfiles, `.claude/` sub-exclusions, and allowlisted root dotfiles/dot-directories.
