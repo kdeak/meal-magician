@@ -107,53 +107,96 @@ final class DraftValidator {
     Set<Long> invalid = new LinkedHashSet<>();
     List<Item> items = new ArrayList<>();
     Map<String, Integer> next = new HashMap<>();
-    int ideas = 0;
+    int[] ideas = {0};
     List<DraftProposal.ProposedItem> proposed =
         proposal.items() == null ? List.of() : proposal.items();
     for (DraftProposal.ProposedItem item : proposed) {
-      if (item == null
-          || item.date() == null
-          || item.date().isBefore(monday)
-          || item.date().isAfter(sunday)
-          || item.slotType() == null) {
+      if (!inWeek(item, monday, sunday)) {
         continue;
       }
-      String key = item.date() + "/" + item.slotType();
-      if (item.mealId() != null) {
-        if (!activeMealIds.contains(item.mealId())) {
-          invalid.add(item.mealId());
-          continue;
-        }
-        int position = next.merge(key, 1, Integer::sum) - 1;
-        items.add(
-            new Item(
-                item.date(), item.slotType(), position, item.mealId(), null, null, null, null));
-      } else if (item.idea() != null) {
-        String name = clean(item.idea().name(), NAME_MAX);
-        if (name.isEmpty() || ideas >= MAX_IDEAS) {
-          continue;
-        }
-        ideas++;
-        int position = next.merge(key, 1, Integer::sum) - 1;
-        String reason = clean(item.idea().reason(), REASON_MAX);
-        items.add(
-            new Item(
-                item.date(),
-                item.slotType(),
-                position,
-                null,
-                name,
-                reason.isEmpty() ? null : reason,
-                names(item.idea().tags(), TAG_MAX, TAGS_PER_IDEA, TAGS_MAX),
-                names(
-                    item.idea().ingredients(),
-                    INGREDIENT_MAX,
-                    INGREDIENTS_PER_MEAL,
-                    INGREDIENTS_MAX)));
+      Item built = buildItem(item, next, invalid, ideas, activeMealIds);
+      if (built != null) {
+        items.add(built);
       }
     }
     String summary = clean(proposal.summary(), SUMMARY_MAX);
     return new Result(summary.isEmpty() ? null : summary, List.copyOf(items), List.copyOf(invalid));
+  }
+
+  /**
+   * Whether a proposed item names a day and slot type inside the week.
+   *
+   * @param item the proposed item, may be {@code null}
+   * @param monday the Monday of the week
+   * @param sunday the Sunday of the week
+   * @return {@code true} when the item has a date inside the week and a slot type
+   */
+  private static boolean inWeek(
+      DraftProposal.ProposedItem item, LocalDate monday, LocalDate sunday) {
+    if (item == null || item.date() == null || item.slotType() == null) {
+      return false;
+    }
+    return !item.date().isBefore(monday) && !item.date().isAfter(sunday);
+  }
+
+  /**
+   * Turns one in-week proposed item into a checked {@link Item}, or {@code null} when it is a
+   * library id outside the catalog or an idea without a usable name.
+   *
+   * @param item the proposed item
+   * @param next the place counter per day and slot type
+   * @param invalid the library ids named by the model that are not active meals, collected here
+   * @param ideas a one-element counter of ideas kept so far, updated here
+   * @param activeMealIds the ids of the household's non-archived meals
+   * @return the checked item, or {@code null} when it is dropped
+   */
+  private static Item buildItem(
+      DraftProposal.ProposedItem item,
+      Map<String, Integer> next,
+      Set<Long> invalid,
+      int[] ideas,
+      Set<Long> activeMealIds) {
+    String key = item.date() + "/" + item.slotType();
+    if (item.mealId() != null) {
+      return buildMealItem(item, key, next, invalid, activeMealIds);
+    } else if (item.idea() != null) {
+      return buildIdeaItem(item, key, next, ideas);
+    }
+    return null;
+  }
+
+  private static Item buildMealItem(
+      DraftProposal.ProposedItem item,
+      String key,
+      Map<String, Integer> next,
+      Set<Long> invalid,
+      Set<Long> activeMealIds) {
+    if (!activeMealIds.contains(item.mealId())) {
+      invalid.add(item.mealId());
+      return null;
+    }
+    int position = next.merge(key, 1, Integer::sum) - 1;
+    return new Item(item.date(), item.slotType(), position, item.mealId(), null, null, null, null);
+  }
+
+  private static Item buildIdeaItem(
+      DraftProposal.ProposedItem item, String key, Map<String, Integer> next, int[] ideas) {
+    String name = clean(item.idea().name(), NAME_MAX);
+    if (name.isEmpty() || ideas[0] >= MAX_IDEAS) {
+      return null;
+    }
+    ideas[0]++;
+    int position = next.merge(key, 1, Integer::sum) - 1;
+    String reason = clean(item.idea().reason(), REASON_MAX);
+    return new Item(
+        item.date(),
+        item.slotType(),
+        position,
+        null,
+        name,
+        reason.isEmpty() ? null : reason,
+        names(item.idea().tags(), TAG_MAX, TAGS_PER_IDEA, TAGS_MAX),
+        names(item.idea().ingredients(), INGREDIENT_MAX, INGREDIENTS_PER_MEAL, INGREDIENTS_MAX));
   }
 
   /**
