@@ -1,0 +1,7 @@
+{
+  "key": "pr-4",
+  "fields": {
+    "summary": "gh-3 Install version 0.76.2 of Trivy",
+    "description": "Closes #3\n### What changed\nPinned `version: v0.76.2` on both `trivy-action` steps in `.github/workflows/ci.yml`, upgrading from the implicit default of 0.70.0.\n\n### Key decisions\n- Kept the existing pinned SHA for `aquasecurity/trivy-action@...# v0.36.0` (that's the action version, not the Trivy binary version) and added the Trivy `version` input, which is the documented way to control the installed Trivy release via `setup-trivy`.\n- Applied to both the gate scan and the SARIF scan steps so both stay in sync.\n\n### How to verify\n```bash\ngrep -A1 \"exit-code\" .github/workflows/ci.yml\n```\nCI will exercise the real scan on next run."
+  }
+}
