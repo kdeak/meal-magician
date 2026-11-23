@@ -243,8 +243,8 @@ final class DraftValidator {
   }
 
   /**
-   * Whether a cleaned candidate name may be kept: not blank, not over the per-item limit, and not
-   * a repeat (ignoring case) of one already seen.
+   * Whether a cleaned candidate name may be kept: not blank, not over the per-item limit, and not a
+   * repeat (ignoring case) of one already seen.
    *
    * @param name the cleaned candidate
    * @param itemMax the longest name the catalog accepts
@@ -252,7 +252,9 @@ final class DraftValidator {
    * @return {@code true} when the candidate is usable
    */
   private static boolean isUsable(String name, int itemMax, Set<String> seen) {
-    return !name.isEmpty() && name.length() <= itemMax && !seen.contains(name.toLowerCase(Locale.ROOT));
+    return !name.isEmpty()
+        && name.length() <= itemMax
+        && !seen.contains(name.toLowerCase(Locale.ROOT));
   }
 
   /** Accumulates kept names up to a count and a joined column size. */
@@ -276,7 +278,8 @@ final class DraftValidator {
      *     caller stops offering further names)
      */
     boolean offer(String name) {
-      int added = length + name.length() + (kept.isEmpty() ? 0 : DraftItemEntity.SEPARATOR.length());
+      int added =
+          length + name.length() + (kept.isEmpty() ? 0 : DraftItemEntity.SEPARATOR.length());
       if (kept.size() >= countMax || added > totalMax) {
         return false;
       }

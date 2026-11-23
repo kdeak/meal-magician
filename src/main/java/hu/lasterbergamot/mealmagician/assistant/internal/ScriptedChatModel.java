@@ -211,7 +211,8 @@ class ScriptedChatModel implements ChatModel {
   }
 
   /** The scripted answer text for one call, dispatched by what the system prompt asks for. */
-  private String answerFor(Prompt prompt, List<String> userMessages, String last, String requestText) {
+  private String answerFor(
+      Prompt prompt, List<String> userMessages, String last, String requestText) {
     String system = prompt.getInstructions().getFirst().getText();
     boolean hungarian = system.contains("in Hungarian");
     if (system.contains(CHAT_MARK)) {
@@ -224,7 +225,8 @@ class ScriptedChatModel implements ChatModel {
   }
 
   /** The week/follow-up/one-slot answer: everything the system prompt does not special-case. */
-  private String planAnswer(Prompt prompt, List<String> userMessages, String last, boolean hungarian) {
+  private String planAnswer(
+      Prompt prompt, List<String> userMessages, String last, boolean hungarian) {
     List<Long> ids = libraryIds(prompt);
     if (SLOT_REQUEST.matcher(last).find()) {
       return slotAnswer(ids, hungarian);
