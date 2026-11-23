@@ -179,43 +179,62 @@ class ScriptedChatModel implements ChatModel {
 
   @Override
   public ChatResponse call(Prompt prompt) {
+    List<String> userMessages = userMessagesOf(prompt);
+    String last = userMessages.getLast();
+    String requestText = requestTextOf(last);
+    requests.add(requestText);
+    prompts.add(allText(prompt));
+    pause();
+    failIfScripted(requestText);
+    String system = prompt.getInstructions().getFirst().getText();
+    String answer = answerFor(prompt, userMessages, last, system);
+    return new ChatResponse(
+        List.of(new Generation(new AssistantMessage(answer))),
+        ChatResponseMetadata.builder().usage(new DefaultUsage(10, 10, 20)).build());
+  }
+
+  /** The user-authored messages of a prompt, in order. */
+  private static List<String> userMessagesOf(Prompt prompt) {
     List<String> userMessages = new ArrayList<>();
     for (Message message : prompt.getInstructions()) {
       if (message.getMessageType() == MessageType.USER) {
         userMessages.add(message.getText());
       }
     }
-    String last = userMessages.getLast();
-    String requestText = requestTextOf(last);
-    requests.add(requestText);
-    prompts.add(allText(prompt));
-    pause();
+    return userMessages;
+  }
+
+  /** Throws when this call must behave like an unreachable Google. */
+  private void failIfScripted(String requestText) {
     if (failing || requestText.contains(FAIL_MARKER)) {
       throw new IllegalStateException("scripted failure");
     }
-    String system = prompt.getInstructions().getFirst().getText();
+  }
+
+  /** Picks the scripted answer for the kind of request the system prompt describes. */
+  private String answerFor(Prompt prompt, List<String> userMessages, String last, String system) {
     boolean hungarian = system.contains("in Hungarian");
-    String answer;
+    String requestText = requestTextOf(last);
     if (system.contains(CHAT_MARK)) {
-      answer = chatReply != null ? chatReply : "Scripted answer: " + requestText;
-    } else if (system.contains(MENU_MARK)) {
-      answer = menuReply != null ? menuReply : menuAnswer(libraryIds(prompt));
-    } else {
-      List<Long> ids = libraryIds(prompt);
-      if (SLOT_REQUEST.matcher(last).find()) {
-        answer = slotAnswer(ids, hungarian);
-      } else {
-        Matcher week = WEEK_START.matcher(userMessages.getFirst());
-        LocalDate monday = week.find() ? LocalDate.parse(week.group(1)) : LocalDate.now();
-        answer =
-            userMessages.size() == 1
-                ? firstAnswer(monday, ids, hungarian)
-                : refinedAnswer(monday, ids, hungarian);
-      }
+      return chatReply != null ? chatReply : "Scripted answer: " + requestText;
     }
-    return new ChatResponse(
-        List.of(new Generation(new AssistantMessage(answer))),
-        ChatResponseMetadata.builder().usage(new DefaultUsage(10, 10, 20)).build());
+    if (system.contains(MENU_MARK)) {
+      return menuReply != null ? menuReply : menuAnswer(libraryIds(prompt));
+    }
+    List<Long> ids = libraryIds(prompt);
+    if (SLOT_REQUEST.matcher(last).find()) {
+      return slotAnswer(ids, hungarian);
+    }
+    return weekAnswer(userMessages, ids, hungarian);
+  }
+
+  /** The week-plan or refined-week answer for a multi-turn draft conversation. */
+  private String weekAnswer(List<String> userMessages, List<Long> ids, boolean hungarian) {
+    Matcher week = WEEK_START.matcher(userMessages.getFirst());
+    LocalDate monday = week.find() ? LocalDate.parse(week.group(1)) : LocalDate.now();
+    return userMessages.size() == 1
+        ? firstAnswer(monday, ids, hungarian)
+        : refinedAnswer(monday, ids, hungarian);
   }
 
   /** Every message of a prompt, system message first, as one text (for the prompt checks). */
