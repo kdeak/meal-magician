@@ -1,38 +1,38 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-11-23T18:03:06.020Z",
+  "recordedAt": "2026-11-23T18:14:39.728Z",
   "ticketKey": "pr-11",
-  "headSha": "5d8c6618eb9f13d2babe73d58aab97d7e31b399a",
+  "headSha": "a318548efbc3d99db04df9072c118aef97a483dd",
   "baseBranch": "main",
   "reviewDecision": "NONE",
   "labels": [],
   "files": {
     "ci_classification.json": {
-      "hash": "fnv1a64:648b0c19256acf8a",
-      "size": 82
+      "hash": "fnv1a64:48970ce38100709a",
+      "size": 162
     },
     "ci_failures.md": {
-      "hash": "fnv1a64:3d83f9ec7ac52799",
-      "size": 75872
+      "hash": "fnv1a64:6f94ca847311ecf3",
+      "size": 151219
     },
     "ci_failures_full.log": {
-      "hash": "fnv1a64:ddac9b91149e065f",
-      "size": 502820
+      "hash": "fnv1a64:35b8dc2e73f0c4a6",
+      "size": 1009402
     },
     "ci_violations.json": {
-      "hash": "fnv1a64:038a6d61a75de84f",
-      "size": 301
+      "hash": "fnv1a64:fb20d70b52b5a0c8",
+      "size": 487
     },
     "merge_conflicts.md": {
       "hash": "fnv1a64:1651ce04a698e642",
       "size": 550
     },
     "pr_diff.txt": {
-      "hash": "fnv1a64:24f82f367960f179",
-      "size": 12300
+      "hash": "fnv1a64:a3162c7355dc20eb",
+      "size": 12304
     },
     "pr_discussions.md": {
-      "hash": "fnv1a64:ef5d18498f98d4ce",
+      "hash": "fnv1a64:525b494e8f98d4ce",
       "size": 196
     },
     "pr_discussions_raw.json": {
@@ -40,8 +40,8 @@
       "size": 19
     },
     "pr_info.md": {
-      "hash": "fnv1a64:a7caccad642e7b97",
-      "size": 2150
+      "hash": "fnv1a64:a3134209bc5415a3",
+      "size": 2151
     },
     "request.md": {
       "hash": "fnv1a64:da5da6553f64483d",
@@ -56,7 +56,7 @@
       "size": 376
     },
     "rework_base_head.txt": {
-      "hash": "fnv1a64:b24bf3ffc9f427bd",
+      "hash": "fnv1a64:5ab708edc9f427bd",
       "size": 40
     },
     "ticket.json": {

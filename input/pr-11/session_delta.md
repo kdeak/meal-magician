@@ -1,7 +1,7 @@
 # Session Delta — What Changed Since Your Last Leg
 
 - **Mode**: `FIRST-LEG`
-- **HEAD SHA**: `none` → `5d8c6618eb9f13d2babe73d58aab97d7e31b399a` *(unchanged)*
+- **HEAD SHA**: `none` → `a318548efbc3d99db04df9072c118aef97a483dd` *(unchanged)*
 - **Review Decision**: `NONE` → `NONE` *(unchanged)*
 
 ## Input Files (`input/<ticket>/`)
