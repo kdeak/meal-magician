@@ -263,17 +263,20 @@ public class DraftGenerator {
     Set<Long> seen = new LinkedHashSet<>();
     List<SlotSuggestion> result = new ArrayList<>();
     for (SlotProposal.Pick pick : proposal.picks()) {
-      if (pick == null || pick.mealId() == null || !names.containsKey(pick.mealId())) {
-        continue;
-      }
-      if (seen.add(pick.mealId()) && result.size() < MAX_SLOT_SUGGESTIONS) {
-        String reason = DraftValidator.clean(pick.reason(), DraftValidator.REASON_MAX);
-        result.add(
-            new SlotSuggestion(
-                pick.mealId(), names.get(pick.mealId()), reason.isEmpty() ? null : reason));
+      if (isUsablePick(pick, names) && seen.add(pick.mealId()) && result.size() < MAX_SLOT_SUGGESTIONS) {
+        result.add(suggestionOf(pick, names));
       }
     }
     return result;
+  }
+
+  private static boolean isUsablePick(SlotProposal.Pick pick, Map<Long, String> names) {
+    return pick != null && pick.mealId() != null && names.containsKey(pick.mealId());
+  }
+
+  private static SlotSuggestion suggestionOf(SlotProposal.Pick pick, Map<Long, String> names) {
+    String reason = DraftValidator.clean(pick.reason(), DraftValidator.REASON_MAX);
+    return new SlotSuggestion(pick.mealId(), names.get(pick.mealId()), reason.isEmpty() ? null : reason);
   }
 
   /**

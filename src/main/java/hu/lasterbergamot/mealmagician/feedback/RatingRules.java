@@ -23,17 +23,30 @@ public final class RatingRules {
    *     trimmed comment is over {@link #MAX_COMMENT} characters
    */
   public static RatingInput check(RatingInput input) {
+    checkThumb(input);
+    checkStars(input);
+    String cleaned = cleanedComment(input);
+    return new RatingInput(input.thumb(), input.stars(), cleaned);
+  }
+
+  private static void checkThumb(RatingInput input) {
     if (input.thumb() == null) {
       throw new InvalidRatingException(RatingProblem.THUMB_REQUIRED);
     }
+  }
+
+  private static void checkStars(RatingInput input) {
     if (input.stars() != null && (input.stars() < 1 || input.stars() > 5)) {
       throw new InvalidRatingException(RatingProblem.STARS_OUT_OF_RANGE);
     }
+  }
+
+  private static String cleanedComment(RatingInput input) {
     String comment = input.comment();
     String cleaned = comment == null || comment.isBlank() ? null : comment.strip();
     if (cleaned != null && cleaned.length() > MAX_COMMENT) {
       throw new InvalidRatingException(RatingProblem.COMMENT_TOO_LONG);
     }
-    return new RatingInput(input.thumb(), input.stars(), cleaned);
+    return cleaned;
   }
 }
