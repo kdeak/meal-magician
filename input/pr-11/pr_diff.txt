@@ -1,0 +1,229 @@
+# PR Diff Truncated
+
+Original size: 12884 characters.
+Kept: first 7800 and last 4200 characters.
+
+The full diff is available in the checked-out PR branch. Use `git diff` or CodeGraph for focused source navigation instead of relying only on this file.
+
+```diff
+diff --git a/.claude/rules/container.md b/.claude/rules/container.md
+index 1cca3b3..5e887a4 100644
+--- a/.claude/rules/container.md
++++ b/.claude/rules/container.md
+@@ -26,7 +26,12 @@ paths:
+   `src/e2eTest/stub-oidc/config.json`), used only by `task test-e2e` / `task test-e2e:run`. The app discovers the stub as
+   `http://oidc:18081` and Chromium maps `oidc` to `127.0.0.1` (`--host-resolver-rules`) with the
+   port published under the same number, so token issuer and browser URL agree. The e2e app runs
+-  with the `postgres` profile, not `prod` (plain HTTP on localhost).
++  with the `postgres` profile, not `prod` (plain HTTP on localhost). The `app` service runs with
++  `read_only: true` + `tmpfs: [/tmp]`: the app writes nothing outside `/tmp` (Tomcat's work dir and
++  multipart staging; JTE templates are precompiled and logging goes to stdout only), verified
++  manually and in the full e2e stack.
++- `COPY --from=build --chown=app:app` in the Dockerfile keeps the extracted jar/lib owned by the
++  non-root `app` user (uid 10001) instead of root, consistent with the non-root execution intent.
+ - **CI** (`.github/workflows/`): every job calls `task` targets; `permissions:` minimal per
+   workflow; third-party actions pinned to a commit SHA; `concurrency` set; Gradle cache via
+   `gradle/actions/setup-gradle`. Required checks report on every PR (no path filters on them).
+diff --git a/Dockerfile b/Dockerfile
+index 3a08171..f7120e2 100644
+--- a/Dockerfile
++++ b/Dockerfile
+@@ -38,7 +38,7 @@ RUN apt-get update \
+ RUN groupadd --gid 10001 app \
+     && useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin app
+ WORKDIR /app
+-COPY --from=build /workspace/extracted/ ./
++COPY --from=build --chown=app:app /workspace/extracted/ ./
+ # Set before the training run below on purpose: the cache is only valid for the heap settings it
+ # was recorded with. Cloud Run overrides the variable with its own value (D11).
+ ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75"
+diff --git a/compose.e2e.yml b/compose.e2e.yml
+index 5385689..efcd6a3 100644
+--- a/compose.e2e.yml
++++ b/compose.e2e.yml
+@@ -9,6 +9,11 @@
+ services:
+   app:
+     image: meal-magician
++    # Read-only root filesystem (container.md): the app writes nothing outside /tmp (Tomcat's
++    # work dir and multipart staging), so /tmp is the only writable path needed at runtime.
++    read_only: true
++    tmpfs:
++      - /tmp
+     depends_on:
+       postgres:
+         condition: service_healthy
+diff --git a/input/pr-11/request.md b/input/pr-11/request.md
+new file mode 100644
+index 0000000..3a92ad4
+--- /dev/null
++++ b/input/pr-11/request.md
+@@ -0,0 +1,33 @@
++# pr-11: gh-9 Review Dockerfile and container build best practices
++
++## Description
++
++Closes #9
++### What changed
++Reviewed the Dockerfile/compose setup against container best practices and verified read-only
++root filesystem + non-root execution work end-to-end. Applied two small hardening fixes found
++during the review; everything else already matched best practice (multi-stage build, digest
++pinning, apt cleanup, minimal runtime, AOT cache, graceful shutdown, healthcheck via bash's
++`/dev/tcp`).
++
++### Key decisions
++- `COPY --from=build --chown=app:app` in the Dockerfile: the extracted jar/lib previously landed
++  owned by root even though the container runs as uid 10001 — harmless today, but blocks tightening
++  file permissions later and is inconsistent with the stated non-root intent.
++- `compose.e2e.yml`'s `app` service now runs with `read_only: true` + `tmpfs: [/tmp]`: verified
++  manually (`docker run --read-only --tmpfs /tmp ...` and inside the full e2e stack) that the app
++  needs no other writable path — JTE templates are precompiled, logging goes to stdout only, and
++  Tomcat's only writes are its work directory under `/tmp`. Documented infeasible-vs-verified per
++  the ticket: **verified feasible**, not infeasible.
++- No JVM flag or multi-stage changes: the existing `-XX:MaxRAMPercentage=75` / AOT cache setup
++  already matches the Cloud Run resource model (D11, D17); `compose.yml` (local Postgres) is
++  unaffected since it doesn't run the app image.
++
++### How to verify
++```bash
++docker build --tag meal-magician .
++docker run --rm -d --read-only --tmpfs /tmp -p 8080:8080 meal-magician
++curl -sf http://localhost:8080/actuator/health   # {"status":"UP"}
++docker exec <container> id                        # uid=10001(app) gid=10001(app)
++./gradlew test -Pfast   # 1694 tests, 0 failures (unaffected by this change)
++```
+diff --git a/input/pr-11/ticket.json b/input/pr-11/ticket.json
+new file mode 100644
+index 0000000..47c24ca
+--- /dev/null
++++ b/input/pr-11/ticket.json
+@@ -0,0 +1,7 @@
++{
++  "key": "pr-11",
++  "fields": {
++    "summary": "gh-9 Review Dockerfile and container build best practices",
++    "description": "Closes #9\n### What changed\nReviewed the Dockerfile/compose setup against container best practices and verified read-only\nroot filesystem + non-root execution work end-to-end. Applied two small hardening fixes found\nduring the review; everything else already matched best practice (multi-stage build, digest\npinning, apt cleanup, minimal runtime, AOT cache, graceful shutdown, healthcheck via bash's\n`/dev/tcp`).\n\n### Key decisions\n- `COPY --from=build --chown=app:app` in the Dockerfile: the extracted jar/lib previously landed\n  owned by root even though the container runs as uid 10001 — harmless today, but blocks tightening\n  file permissions later and is inconsistent with the stated non-root intent.\n- `compose.e2e.yml`'s `app` service now runs with `read_only: true` + `tmpfs: [/tmp]`: verified\n  manually (`docker run --read-only --tmpfs /tmp ...` and inside the full e2e stack) that the app\n  needs no other writable path — JTE templates are precompiled, logging goes to stdout only, and\n  Tomcat's only writes are its work directory under `/tmp`. Documented infeasible-vs-verified per\n  the ticket: **verified feasible**, not infeasible.\n- No JVM flag or multi-stage changes: the existing `-XX:MaxRAMPercentage=75` / AOT cache setup\n  already matches the Cloud Run resource model (D11, D17); `compose.yml` (local Postgres) is\n  unaffected since it doesn't run the app image.\n\n### How to verify\n```bash\ndocker build --tag meal-magician .\ndocker run --rm -d --read-only --tmpfs /tmp -p 8080:8080 meal-magician\ncurl -sf http://localhost:8080/actuator/health   # {\"status\":\"UP\"}\ndocker exec <container> id                        # uid=10001(app) gid=10001(app)\n./gradlew test -Pfast   # 1694 tests, 0 failures (unaffected by this change)\n```"
++  }
++}
+\ No newline at end of file
+diff --git a/input/pr-11/ticket.md b/input/pr-11/ticket.md
+new file mode 100644
+index 0000000..3a92ad4
+--- /dev/null
++++ b/input/pr-11/ticket.md
+@@ -0,0 +1,33 @@
++# pr-11: gh-9 Review Dockerfile and container build best practices
++
++## Description
++
++Closes #9
++### What changed
++Reviewed the Dockerfile/compose setup against container best practices and verified read-only
++root filesystem + non-root execution work end-to-end. Applied two small hardening fixes found
++during the review; everything else already matched best practice (multi-stage build, digest
++pinning, apt cleanup, minimal runtime, AOT cache, graceful shutdown, healthcheck via bash's
++`/dev/tcp`).
++
++### Key decisions
++- `COPY --from=build --chown=app:app` in the Dockerfile: the extracted jar/lib previously landed
++  owned by root even though the container runs as uid 10001 — harmless today, but blocks tightening
++  file permissions later and is inconsistent with the stated non-root intent.
++- `compose.e2e.yml`'s `app` service now runs with `read_only: true` + `tmpfs: [/tmp]`: verified
++  manually (`docker run --read-only --tmpfs /tmp ...` and inside the full e2e stack) that the app
++  
+
+... [884 characters omitted] ...
+
+va/hu/lasterbergamot/mealmagician/assistant/internal/ScriptedChatModel.java b/src/main/java/hu/lasterbergamot/mealmagician/assistant/internal/ScriptedChatModel.java
+index 02addd0..5ba64e5 100644
+--- a/src/main/java/hu/lasterbergamot/mealmagician/assistant/internal/ScriptedChatModel.java
++++ b/src/main/java/hu/lasterbergamot/mealmagician/assistant/internal/ScriptedChatModel.java
+@@ -179,43 +179,62 @@ class ScriptedChatModel implements ChatModel {
+ 
+   @Override
+   public ChatResponse call(Prompt prompt) {
++    List<String> userMessages = userMessagesOf(prompt);
++    String last = userMessages.getLast();
++    String requestText = requestTextOf(last);
++    requests.add(requestText);
++    prompts.add(allText(prompt));
++    pause();
++    failIfScripted(requestText);
++    String system = prompt.getInstructions().getFirst().getText();
++    String answer = answerFor(prompt, userMessages, last, system);
++    return new ChatResponse(
++        List.of(new Generation(new AssistantMessage(answer))),
++        ChatResponseMetadata.builder().usage(new DefaultUsage(10, 10, 20)).build());
++  }
++
++  /** The user-authored messages of a prompt, in order. */
++  private static List<String> userMessagesOf(Prompt prompt) {
+     List<String> userMessages = new ArrayList<>();
+     for (Message message : prompt.getInstructions()) {
+       if (message.getMessageType() == MessageType.USER) {
+         userMessages.add(message.getText());
+       }
+     }
+-    String last = userMessages.getLast();
+-    String requestText = requestTextOf(last);
+-    requests.add(requestText);
+-    prompts.add(allText(prompt));
+-    pause();
++    return userMessages;
++  }
++
++  /** Throws when this call must behave like an unreachable Google. */
++  private void failIfScripted(String requestText) {
+     if (failing || requestText.contains(FAIL_MARKER)) {
+       throw new IllegalStateException("scripted failure");
+     }
+-    String system = prompt.getInstructions().getFirst().getText();
++  }
++
++  /** Picks the scripted answer for the kind of request the system prompt describes. */
++  private String answerFor(Prompt prompt, List<String> userMessages, String last, String system) {
+     boolean hungarian = system.contains("in Hungarian");
+-    String answer;
++    String requestText = requestTextOf(last);
+     if (system.contains(CHAT_MARK)) {
+-      answer = chatReply != null ? chatReply : "Scripted answer: " + requestText;
+-    } else if (system.contains(MENU_MARK)) {
+-      answer = menuReply != null ? menuReply : menuAnswer(libraryIds(prompt));
+-    } else {
+-      List<Long> ids = libraryIds(prompt);
+-      if (SLOT_REQUEST.matcher(last).find()) {
+-        answer = slotAnswer(ids, hungarian);
+-      } else {
+-        Matcher week = WEEK_START.matcher(userMessages.getFirst());
+-        LocalDate monday = week.find() ? LocalDate.parse(week.group(1)) : LocalDate.now();
+-        answer =
+-            userMessages.size() == 1
+-                ? firstAnswer(monday, ids, hungarian)
+-                : refinedAnswer(monday, ids, hungarian);
+-      }
++      return chatReply != null ? chatReply : "Scripted answer: " + requestText;
+     }
+-    return new ChatResponse(
+-        List.of(new Generation(new AssistantMessage(answer))),
+-        ChatResponseMetadata.builder().usage(new DefaultUsage(10, 10, 20)).build());
++    if (system.contains(MENU_MARK)) {
++      return menuReply != null ? menuReply : menuAnswer(libraryIds(prompt));
++    }
++    List<Long> ids = libraryIds(prompt);
++    if (SLOT_REQUEST.matcher(last).find()) {
++      return slotAnswer(ids, hungarian);
++    }
++    return weekAnswer(userMessages, ids, hungarian);
++  }
++
++  /** The week-plan or refined-week answer for a multi-turn draft conversation. */
++  private String weekAnswer(List<String> userMessages, List<Long> ids, boolean hungarian) {
++    Matcher week = WEEK_START.matcher(userMessages.getFirst());
++    LocalDate monday = week.find() ? LocalDate.parse(week.group(1)) : LocalDate.now();
++    return userMessages.size() == 1
++        ? firstAnswer(monday, ids, hungarian)
++        : refinedAnswer(monday, ids, hungarian);
+   }
+ 
+   /** Every message of a prompt, system message first, as one text (for the prompt checks). */
+```

@@ -1,0 +1,16 @@
+{
+  "generatedAt": "2026-11-23T18:03:04.545Z",
+  "owned": 0,
+  "foreign": 0,
+  "unknown": 1,
+  "violations": [
+    {
+      "check": "quality",
+      "rule": "error",
+      "path": null,
+      "line": null,
+      "detail": "Process completed with exit code 2.",
+      "ownership": "unknown"
+    }
+  ]
+}
