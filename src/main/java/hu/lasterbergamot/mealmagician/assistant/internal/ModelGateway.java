@@ -160,9 +160,7 @@ public class ModelGateway implements AutoCloseable {
     ledger.assertWithinCap(householdId);
     refuseEmptyMessages(prompt);
     Prompt current = prompt;
-    long input = 0;
-    long output = 0;
-    long cost = 0;
+    Totals totals = new Totals();
     long started = nanoClock.getAsLong();
     for (int round = 0; round < MAX_ROUNDS; round++) {
       Duration remaining = properties.requestTimeout().minusNanos(nanoClock.getAsLong() - started);
@@ -176,11 +174,31 @@ public class ModelGateway implements AutoCloseable {
               () -> chatModel.call(sent),
               budgetLimits ? remaining : properties.timeout(),
               budgetLimits ? this::requestTooLong : this::callTimedOut);
-      var generation = response.getResult();
-      String text =
-          generation == null
-              ? ""
-              : Objects.requireNonNullElse(generation.getOutput().getText(), "");
+      String text = textOf(response);
+      totals.record(householdId, response, sent, text);
+      if (!response.hasToolCalls()) {
+        return new ModelReply(text, totals.input, totals.output, totals.cost);
+      }
+      current = withToolResults(current, response);
+    }
+    throw new ModelUnavailableException(
+        "the model was still asking for tools after " + MAX_ROUNDS + " calls");
+  }
+
+  private static String textOf(ChatResponse response) {
+    var generation = response.getResult();
+    return generation == null
+        ? ""
+        : Objects.requireNonNullElse(generation.getOutput().getText(), "");
+  }
+
+  /** Running totals for one {@link #complete} call, metered round by round. */
+  private final class Totals {
+    private long input;
+    private long output;
+    private long cost;
+
+    void record(long householdId, ChatResponse response, Prompt sent, String text) {
       Usage usage = response.getMetadata().getUsage();
       long roundInput = tokens(usage.getPromptTokens());
       long roundOutput =
@@ -194,13 +212,7 @@ public class ModelGateway implements AutoCloseable {
       cost += ledger.record(householdId, roundInput, roundOutput);
       input += roundInput;
       output += roundOutput;
-      if (!response.hasToolCalls()) {
-        return new ModelReply(text, input, output, cost);
-      }
-      current = withToolResults(current, response);
     }
-    throw new ModelUnavailableException(
-        "the model was still asking for tools after " + MAX_ROUNDS + " calls");
   }
 
   private ModelUnavailableException requestTooLong() {

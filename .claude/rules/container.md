@@ -26,7 +26,12 @@ paths:
   `src/e2eTest/stub-oidc/config.json`), used only by `task test-e2e` / `task test-e2e:run`. The app discovers the stub as
   `http://oidc:18081` and Chromium maps `oidc` to `127.0.0.1` (`--host-resolver-rules`) with the
   port published under the same number, so token issuer and browser URL agree. The e2e app runs
-  with the `postgres` profile, not `prod` (plain HTTP on localhost).
+  with the `postgres` profile, not `prod` (plain HTTP on localhost). The `app` service runs with
+  `read_only: true` + `tmpfs: [/tmp]`: the app writes nothing outside `/tmp` (Tomcat's work dir and
+  multipart staging; JTE templates are precompiled and logging goes to stdout only), verified
+  manually and in the full e2e stack.
+- `COPY --from=build --chown=app:app` in the Dockerfile keeps the extracted jar/lib owned by the
+  non-root `app` user (uid 10001) instead of root, consistent with the non-root execution intent.
 - **CI** (`.github/workflows/`): every job calls `task` targets; `permissions:` minimal per
   workflow; third-party actions pinned to a commit SHA; `concurrency` set; Gradle cache via
   `gradle/actions/setup-gradle`. Required checks report on every PR (no path filters on them).

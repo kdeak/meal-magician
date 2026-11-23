@@ -9,6 +9,11 @@
 services:
   app:
     image: meal-magician
+    # Read-only root filesystem (container.md): the app writes nothing outside /tmp (Tomcat's
+    # work dir and multipart staging), so /tmp is the only writable path needed at runtime.
+    read_only: true
+    tmpfs:
+      - /tmp
     depends_on:
       postgres:
         condition: service_healthy
